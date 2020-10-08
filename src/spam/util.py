@@ -20,6 +20,7 @@ def add_intercept_fn(x):
 
     return new_x
 
+
 def load_csv(csv_path, label_col='y', add_intercept=False):
     """Load dataset from a CSV file.
 
@@ -51,6 +52,7 @@ def load_csv(csv_path, label_col='y', add_intercept=False):
 
     return inputs, labels
 
+
 def load_spam_dataset(tsv_path):
     """Load the spam dataset from a TSV file
 
@@ -73,6 +75,7 @@ def load_spam_dataset(tsv_path):
             labels.append(1 if label == 'spam' else 0)
 
     return messages, np.array(labels)
+
 
 def plot(x, y, theta, save_path, correction=1.0):
     """Plot dataset and fitted logistic regression parameters.
@@ -111,6 +114,7 @@ def plot_contour(predict_fn):
 
     plt.contourf(x, y, z, levels=[-float('inf'), 0, float('inf')], colors=['orange', 'cyan'])
 
+
 def plot_points(x, y):
     """Plot some points where x are the coordinates and y is the label"""
     x_one = x[y == 0, :]
@@ -119,7 +123,52 @@ def plot_points(x, y):
     plt.scatter(x_one[:,0], x_one[:,1], marker='x', color='red')
     plt.scatter(x_two[:,0], x_two[:,1], marker='o', color='blue')
 
+
 def write_json(filename, value):
     """Write the provided value as JSON to the given filename"""
     with open(filename, 'w') as f:
         json.dump(value, f)
+
+
+def get_word_with_this_index(dictionary, value):
+    for k, v in dictionary.items():
+        if v == value:
+            return k
+    return None
+
+
+def count_total_words(matrix) -> {int, int}:
+    words_count: {int, int} = dict()
+    transpose = matrix.transpose()
+    for index, word_entry in enumerate(transpose):
+        words_count[index] = sum(word_entry)
+    return words_count
+
+
+def get_this_word_probability(matrix, labels, word_index, spam_words_count, not_spam_words_count):
+    spam_and_this_word = 0
+    not_spam_and_this_word = 0
+
+    for index, message in enumerate(matrix):
+        value = message[word_index]
+        if value > 0:
+            if labels[index] == 1:
+                spam_and_this_word += value
+            else:
+                not_spam_and_this_word += value
+
+    this_word_given_spam_probability = spam_and_this_word / spam_words_count
+    this_word_given_not_spam_probability = not_spam_and_this_word / not_spam_words_count
+
+    return this_word_given_spam_probability, this_word_given_not_spam_probability
+
+
+def get_words_count_filtered_by_spams(matrix, labels):
+    spam_words_count = 0
+    not_spam_words_count = 0
+    for message_index in range(len(labels)):
+        if labels[message_index] == 1:
+            spam_words_count += sum(matrix[message_index])
+        else:
+            not_spam_words_count += sum(matrix[message_index])
+    return spam_words_count, not_spam_words_count

@@ -1,6 +1,7 @@
 import numpy as np
 
 from src.spam import util, svm
+from src.spam.util import get_word_with_this_index, get_this_word_probability, get_words_count_filtered_by_spams
 
 
 def get_words(message: str) -> [str]:
@@ -83,57 +84,6 @@ def transform_text(messages: [str], word_dictionary: {str, int}):
     return matrix
 
 
-def count_total_words(matrix) -> {int, int}:
-    words_count: {int, int} = dict()
-    transpose = matrix.transpose()
-    for index, word_entry in enumerate(transpose):
-        words_count[index] = sum(word_entry)
-    return words_count
-
-
-def get_this_word_probability(matrix, labels, word_index, spam_words_count, not_spam_words_count):
-    # Each row in the resulting array should correspond to each message
-    # and each column should correspond to a word of the vocabulary.
-    # p(x word | spam) = p(spam ^ x word) / p(spam)
-    #               ['word1' 'word2' 'word3']  [label]
-    # ['message 1']    0       2        0         1
-    # ['message 2']    1       1        3         0
-    # ['message 3']    1       0        1         1
-    # word 1 spam = 1/4
-    # word 1 not spam = 1/5
-    # word 2 spam = 2/4
-    # word 2 not spam = 1/5
-    # word 3 spam = 1/4
-    # word 3 not spam = 3/5
-
-    spam_and_this_word = 0
-    not_spam_and_this_word = 0
-
-    for index, message in enumerate(matrix):
-        value = message[word_index]
-        if value > 0:
-            if labels[index] == 1:
-                spam_and_this_word += value
-            else:
-                not_spam_and_this_word += value
-
-    this_word_given_spam_probability = spam_and_this_word / spam_words_count
-    this_word_given_not_spam_probability = not_spam_and_this_word / not_spam_words_count
-
-    return this_word_given_spam_probability, this_word_given_not_spam_probability
-
-
-def get_words_count_filtered_by_spams(matrix, labels):
-    spam_words_count = 0
-    not_spam_words_count = 0
-    for message_index in range(len(labels)):
-        if labels[message_index] == 1:
-            spam_words_count += sum(matrix[message_index])
-        else:
-            not_spam_words_count += sum(matrix[message_index])
-    return spam_words_count, not_spam_words_count
-
-
 def fit_naive_bayes_model(matrix, labels):
     """Fit a naive bayes model.
 
@@ -149,20 +99,11 @@ def fit_naive_bayes_model(matrix, labels):
 
     Returns: The trained model
     """
-    # P(spam | uso 'x') = P(uso 'x' | spam) * P(spam) / P('x')
-    # merged = np.c_[matrix, labels]
     words = np.zeros(shape=(matrix.shape[1], 2), dtype=np.float64)
-    words_count_dict: {int, int} = count_total_words(matrix)
-
     spam_words_count, not_spam_words_count = get_words_count_filtered_by_spams(matrix, labels)
     spam = np.array([np.count_nonzero(labels == 1)/len(labels), np.count_nonzero(labels == 0)/len(labels)], dtype=np.float32)
 
     for i in range(matrix.shape[1]):
-        this_word_count = words_count_dict[i]
-        # if this_word_count == 0:
-        #     words[i][0] = 0
-        #     words[i][1] = 0
-        # else:
         this_word_and_spam_probability, this_word_and_not_spam_probability = get_this_word_probability(
             matrix, labels, i, spam_words_count, not_spam_words_count)
         words[i][0] = this_word_and_spam_probability
@@ -183,40 +124,18 @@ def predict_from_naive_bayes_model(model, matrix):
 
     Returns: A numpy array containg the predictions from the model
     """
-    #               ['word1' 'word2' 'word3']  [label]
-    # ['message 1']    0       2        0         1
-    # ['message 2']    1       1        3         0
-    # ['message 3']    1       0        1         1
-
     predict = np.zeros(shape=matrix.shape[0], dtype=np.int8)
 
     for message_index, message in enumerate(matrix):
-        # message_is_spam_probability = math.log(model['spam'][0])
         message_is_spam_probability = model['spam'][0]
         message_is_not_spam_probability = model['spam'][1]
-        # message_is_not_spam_probability = math.log(model['spam'][1])
         for word_index, count in enumerate(message):
             if count > 0:
-                # if model['words'][word_index][0] > 0:
-                # message_is_spam_probability += (math.log(model['words'][word_index][0]) * count)
                 message_is_spam_probability *= (model['words'][word_index][0] ** count)
-                # message_is_spam_probability *= (model['words'][word_index][0])
-
-                # if model['words'][word_index][1] > 0:
-                # message_is_not_spam_probability += (math.log(model['words'][word_index][1]) * count)
                 message_is_not_spam_probability *= (model['words'][word_index][1] ** count)
-                # message_is_not_spam_probability *= (model['words'][word_index][1])
 
-        # else:
         predict[message_index] = 1 if message_is_spam_probability > message_is_not_spam_probability else 0
     return predict
-
-
-def get_word_with_this_index(dictionary, value):
-    for k, v in dictionary.items():
-        if v == value:
-            return k
-    return None
 
 
 def get_top_five_naive_bayes_words(model, dictionary):
