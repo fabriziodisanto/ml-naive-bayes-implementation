@@ -1,4 +1,4 @@
-name: XCS229
+name: Naive-Bayes-ML
 channels:
   - defaults
 dependencies:
